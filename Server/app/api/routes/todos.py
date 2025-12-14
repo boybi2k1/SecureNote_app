@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 from app.database import get_db
 from app.models import Todo, TodoItem, User, Category, Tag, TodoTag, Note
 from app.schemas import TodoCreate, TodoUpdate, TodoResponse, TodoItemCreate, TodoItemUpdate, TodoItemResponse
@@ -12,6 +13,54 @@ from app.security import (
 from app.api.deps import get_current_user
 
 router = APIRouter()
+
+
+def calculate_next_occurrence(
+    pattern: str,
+    interval: int,
+    start_date: datetime,
+    end_date: Optional[datetime] = None,
+    count: Optional[int] = None
+) -> Optional[datetime]:
+    """
+    Calculate the next occurrence date based on recurrence pattern.
+    
+    Args:
+        pattern: daily, weekly, monthly, yearly
+        interval: Every X days/weeks/months
+        start_date: The starting date (usually due_date or reminder_at)
+        end_date: Optional end date for recurrence
+        count: Optional number of occurrences
+    
+    Returns:
+        Next occurrence date or None if recurrence has ended
+    """
+    if not pattern or not start_date:
+        return None
+    
+    now = datetime.now(start_date.tzinfo) if start_date.tzinfo else datetime.now()
+    
+    # Check if recurrence has ended
+    if end_date and now >= end_date:
+        return None
+    
+    # Calculate next occurrence based on pattern
+    if pattern == "daily":
+        next_date = start_date + timedelta(days=interval)
+    elif pattern == "weekly":
+        next_date = start_date + timedelta(weeks=interval)
+    elif pattern == "monthly":
+        next_date = start_date + relativedelta(months=interval)
+    elif pattern == "yearly":
+        next_date = start_date + relativedelta(years=interval)
+    else:
+        return None
+    
+    # Check if next occurrence exceeds end_date
+    if end_date and next_date > end_date:
+        return None
+    
+    return next_date
 
 
 def get_user_encryption_key(user: User) -> bytes:
@@ -310,6 +359,19 @@ async def create_todo(
     is_completed = todo_data.status == "completed"
     completed_at = datetime.now() if is_completed else None
     
+    # Calculate next occurrence if recurring
+    next_occurrence = None
+    is_recurring_template = False
+    if todo_data.recurrence_pattern and todo_data.due_date:
+        is_recurring_template = True
+        next_occurrence = calculate_next_occurrence(
+            pattern=todo_data.recurrence_pattern,
+            interval=todo_data.recurrence_interval or 1,
+            start_date=todo_data.due_date,
+            end_date=todo_data.recurrence_end_date,
+            count=todo_data.recurrence_count
+        )
+    
     # Create todo
     db_todo = Todo(
         user_id=current_user.id,
@@ -326,7 +388,14 @@ async def create_todo(
         is_completed=is_completed,
         completed_at=completed_at,
         category_id=todo_data.category_id,
-        linked_note_id=todo_data.linked_note_id
+        linked_note_id=todo_data.linked_note_id,
+        # Recurrence fields
+        recurrence_pattern=todo_data.recurrence_pattern,
+        recurrence_interval=todo_data.recurrence_interval or 1,
+        recurrence_end_date=todo_data.recurrence_end_date,
+        recurrence_count=todo_data.recurrence_count,
+        next_occurrence_date=next_occurrence,
+        is_recurring_template=is_recurring_template
     )
     db.add(db_todo)
     db.flush()
@@ -357,6 +426,13 @@ async def create_todo(
         "deleted_at": db_todo.deleted_at,
         "is_shared": db_todo.is_shared,
         "linked_note_id": db_todo.linked_note_id,
+        "recurrence_pattern": db_todo.recurrence_pattern,
+        "recurrence_interval": db_todo.recurrence_interval,
+        "recurrence_end_date": db_todo.recurrence_end_date,
+        "recurrence_count": db_todo.recurrence_count,
+        "parent_todo_id": db_todo.parent_todo_id,
+        "next_occurrence_date": db_todo.next_occurrence_date,
+        "is_recurring_template": db_todo.is_recurring_template,
         "created_at": db_todo.created_at,
         "updated_at": db_todo.updated_at,
         "tag_ids": todo_data.tag_ids or [],
@@ -438,6 +514,40 @@ async def update_todo(
         todo.due_date = todo_update.due_date
     if todo_update.reminder_at is not None:
         todo.reminder_at = todo_update.reminder_at
+    
+    # Update recurrence fields
+    recurrence_changed = False
+    if todo_update.recurrence_pattern is not None:
+        todo.recurrence_pattern = todo_update.recurrence_pattern
+        recurrence_changed = True
+    if todo_update.recurrence_interval is not None:
+        todo.recurrence_interval = todo_update.recurrence_interval
+        recurrence_changed = True
+    if todo_update.recurrence_end_date is not None:
+        todo.recurrence_end_date = todo_update.recurrence_end_date
+        recurrence_changed = True
+    if todo_update.recurrence_count is not None:
+        todo.recurrence_count = todo_update.recurrence_count
+        recurrence_changed = True
+    
+    # Recalculate next occurrence if recurrence changed or due_date changed
+    if recurrence_changed or todo_update.due_date is not None:
+        if todo.recurrence_pattern and (todo.due_date or todo_update.due_date):
+            due_date = todo_update.due_date if todo_update.due_date is not None else todo.due_date
+            todo.next_occurrence_date = calculate_next_occurrence(
+                pattern=todo.recurrence_pattern,
+                interval=todo.recurrence_interval or 1,
+                start_date=due_date,
+                end_date=todo.recurrence_end_date,
+                count=todo.recurrence_count
+            )
+            todo.is_recurring_template = True
+        elif todo_update.recurrence_pattern is not None and not todo_update.recurrence_pattern:
+            # Recurrence removed
+            todo.recurrence_pattern = None
+            todo.is_recurring_template = False
+            todo.next_occurrence_date = None
+    
     if todo_update.linked_note_id is not None:
         if todo_update.linked_note_id == 0:
             todo.linked_note_id = None
@@ -520,6 +630,13 @@ async def update_todo(
         "deleted_at": todo.deleted_at,
         "is_shared": todo.is_shared,
         "linked_note_id": todo.linked_note_id,
+        "recurrence_pattern": todo.recurrence_pattern,
+        "recurrence_interval": todo.recurrence_interval,
+        "recurrence_end_date": todo.recurrence_end_date,
+        "recurrence_count": todo.recurrence_count,
+        "parent_todo_id": todo.parent_todo_id,
+        "next_occurrence_date": todo.next_occurrence_date,
+        "is_recurring_template": todo.is_recurring_template,
         "created_at": todo.created_at,
         "updated_at": todo.updated_at,
         "tag_ids": [tag.id for tag in todo.tags],
@@ -679,6 +796,13 @@ async def restore_todo(
         "deleted_at": todo.deleted_at,
         "is_shared": todo.is_shared,
         "linked_note_id": todo.linked_note_id,
+        "recurrence_pattern": todo.recurrence_pattern,
+        "recurrence_interval": todo.recurrence_interval,
+        "recurrence_end_date": todo.recurrence_end_date,
+        "recurrence_count": todo.recurrence_count,
+        "parent_todo_id": todo.parent_todo_id,
+        "next_occurrence_date": todo.next_occurrence_date,
+        "is_recurring_template": todo.is_recurring_template,
         "created_at": todo.created_at,
         "updated_at": todo.updated_at,
         "tag_ids": [tag.id for tag in todo.tags],
@@ -949,4 +1073,128 @@ async def toggle_item_complete(
     db.commit()
     
     return {"is_completed": item.is_completed}
+
+
+@router.post("/recurring/generate-instances")
+async def generate_recurring_instances(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Generate next instances for recurring todos.
+    This should be called periodically (e.g., daily) or when app opens.
+    """
+    now = datetime.now()
+    generated_count = 0
+    
+    # Find all recurring templates that need new instances
+    recurring_templates = db.query(Todo).filter(
+        Todo.user_id == current_user.id,
+        Todo.is_recurring_template == True,
+        Todo.is_deleted == False,
+        Todo.next_occurrence_date.isnot(None),
+        Todo.next_occurrence_date <= now
+    ).all()
+    
+    user_key = get_user_encryption_key(current_user)
+    
+    for template in recurring_templates:
+        # Check if recurrence has ended
+        if template.recurrence_end_date and now >= template.recurrence_end_date:
+            template.is_recurring_template = False
+            template.next_occurrence_date = None
+            db.commit()
+            continue
+        
+        # Decrypt template data
+        try:
+            template_title = decrypt_note_data(
+                template.title_encrypted,
+                template.title_nonce,
+                template.title_tag,
+                user_key
+            )
+            template_description = None
+            if template.description_encrypted:
+                template_description = decrypt_note_data(
+                    template.description_encrypted,
+                    template.description_nonce,
+                    template.description_tag,
+                    user_key
+                )
+        except Exception as e:
+            print(f"Error decrypting template {template.id}: {str(e)}")
+            continue
+        
+        # Create new instance
+        new_due_date = template.next_occurrence_date
+        new_reminder_at = None
+        if template.reminder_at and template.due_date:
+            # Calculate reminder offset
+            reminder_offset = template.reminder_at - template.due_date
+            new_reminder_at = new_due_date + reminder_offset
+        
+        # Encrypt new instance data
+        try:
+            title_encrypted, title_nonce, title_tag = encrypt_note_data(template_title, user_key)
+            description_encrypted = None
+            description_nonce = None
+            description_tag = None
+            if template_description:
+                description_encrypted, description_nonce, description_tag = encrypt_note_data(
+                    template_description, user_key
+                )
+        except Exception as e:
+            print(f"Error encrypting new instance for template {template.id}: {str(e)}")
+            continue
+        
+        # Create new todo instance
+        new_todo = Todo(
+            user_id=current_user.id,
+            title_encrypted=title_encrypted,
+            title_nonce=title_nonce,
+            title_tag=title_tag,
+            description_encrypted=description_encrypted,
+            description_nonce=description_nonce,
+            description_tag=description_tag,
+            status="pending",
+            priority=template.priority,
+            due_date=new_due_date,
+            reminder_at=new_reminder_at,
+            is_completed=False,
+            category_id=template.category_id,
+            linked_note_id=template.linked_note_id,
+            parent_todo_id=template.id,  # Link to parent template
+            is_recurring_template=False  # Instance is not a template
+        )
+        db.add(new_todo)
+        db.flush()
+        
+        # Copy tags
+        for tag in template.tags:
+            db.add(TodoTag(todo_id=new_todo.id, tag_id=tag.id))
+        
+        # Calculate next occurrence
+        next_occurrence = calculate_next_occurrence(
+            pattern=template.recurrence_pattern,
+            interval=template.recurrence_interval or 1,
+            start_date=new_due_date,
+            end_date=template.recurrence_end_date,
+            count=template.recurrence_count
+        )
+        
+        # Update template's next occurrence
+        template.next_occurrence_date = next_occurrence
+        
+        # If no next occurrence, mark template as inactive
+        if not next_occurrence:
+            template.is_recurring_template = False
+        
+        generated_count += 1
+    
+    db.commit()
+    return {
+        "message": f"Generated {generated_count} recurring todo instances",
+        "count": generated_count
+    }
 

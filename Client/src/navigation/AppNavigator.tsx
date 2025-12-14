@@ -11,6 +11,7 @@ import { ShareNoteScreen } from '../screens/Notes/ShareNoteScreen';
 import { SharedNotesScreen } from '../screens/Notes/SharedNotesScreen';
 import { CategoriesScreen } from '../screens/Categories/CategoriesScreen';
 import { CategoryEditScreen } from '../screens/Categories/CategoryEditScreen';
+import { CalendarScreen } from '../screens/Calendar/CalendarScreen';
 import { SettingsScreen } from '../screens/Settings/SettingsScreen';
 import { ProfileScreen } from '../screens/Settings/ProfileScreen';
 import { ChangePasswordScreen } from '../screens/Settings/ChangePasswordScreen';
@@ -85,6 +86,13 @@ export const AppNavigator: React.FC = () => {
         options={({ route }) => ({
           title: route.params?.categoryId ? 'Chỉnh sửa danh mục' : 'Tạo danh mục mới',
         })}
+      />
+      <Stack.Screen 
+        name="Calendar" 
+        component={CalendarScreen}
+        options={{
+          title: 'Lịch',
+        }}
       />
       <Stack.Screen 
         name="Trash" 

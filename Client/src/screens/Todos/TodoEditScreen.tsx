@@ -19,6 +19,7 @@ import { CategoryPicker } from '../../components/CategoryPicker';
 import { TagInput } from '../../components/TagInput';
 import { ReminderPicker } from '../../components/ReminderPicker';
 import { DueDatePicker } from '../../components/DueDatePicker';
+import { RecurrencePicker, RecurrencePattern } from '../../components/RecurrencePicker';
 import { AppStackParamList } from '../Notes/NotesListScreen';
 import { CreateTodoDto, UpdateTodoDto } from '../../types/todo.types';
 import { Tag } from '../../types/tag.types';
@@ -42,6 +43,12 @@ export const TodoEditScreen: React.FC = () => {
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [originalTags, setOriginalTags] = useState<Tag[]>([]);
+  // Recurrence state
+  const [recurrencePattern, setRecurrencePattern] = useState<RecurrencePattern>(null);
+  const [recurrenceInterval, setRecurrenceInterval] = useState<number>(1);
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | null>(null);
+  const [recurrenceEndCount, setRecurrenceEndCount] = useState<number | null>(null);
+  const [recurrenceEndType, setRecurrenceEndType] = useState<'never' | 'date' | 'count'>('never');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -72,6 +79,18 @@ export const TodoEditScreen: React.FC = () => {
       const todoTags = todo.tags || [];
       setSelectedTags(todoTags);
       setOriginalTags(todoTags);
+      // Load recurrence data
+      setRecurrencePattern(todo.recurrence_pattern || null);
+      setRecurrenceInterval(todo.recurrence_interval || 1);
+      setRecurrenceEndDate(todo.recurrence_end_date ? parseServerDateTime(todo.recurrence_end_date) : null);
+      setRecurrenceEndCount(todo.recurrence_count || null);
+      if (todo.recurrence_end_date) {
+        setRecurrenceEndType('date');
+      } else if (todo.recurrence_count) {
+        setRecurrenceEndType('count');
+      } else {
+        setRecurrenceEndType('never');
+      }
     } catch (err: any) {
       Alert.alert('Lỗi', err.response?.data?.detail || 'Không thể tải todo');
       navigation.goBack();
@@ -91,6 +110,23 @@ export const TodoEditScreen: React.FC = () => {
 
       const tagIds = selectedTags.map((tag) => tag.id);
 
+      // Prepare recurrence data
+      const recurrenceData: any = {};
+      if (recurrencePattern) {
+        recurrenceData.recurrence_pattern = recurrencePattern;
+        recurrenceData.recurrence_interval = recurrenceInterval;
+        if (recurrenceEndType === 'date' && recurrenceEndDate) {
+          recurrenceData.recurrence_end_date = toLocalISOString(recurrenceEndDate);
+        } else if (recurrenceEndType === 'count' && recurrenceEndCount) {
+          recurrenceData.recurrence_count = recurrenceEndCount;
+        }
+      } else {
+        // Clear recurrence if pattern is null
+        recurrenceData.recurrence_pattern = null;
+        recurrenceData.recurrence_end_date = null;
+        recurrenceData.recurrence_count = null;
+      }
+
       if (isEditMode && todoId) {
         const updateData: UpdateTodoDto = {
           title: title.trim(),
@@ -101,6 +137,7 @@ export const TodoEditScreen: React.FC = () => {
           reminder_at: reminderAt ? toLocalISOString(reminderAt) : undefined,
           category_id: categoryId || undefined,
           tag_ids: tagIds.length > 0 ? tagIds : [],
+          ...recurrenceData,
         };
         await updateTodo(todoId, updateData);
       } else {
@@ -113,6 +150,7 @@ export const TodoEditScreen: React.FC = () => {
           reminder_at: reminderAt ? toLocalISOString(reminderAt) : undefined,
           category_id: categoryId || undefined,
           tag_ids: tagIds.length > 0 ? tagIds : undefined,
+          ...recurrenceData,
         };
         await createTodo(createData);
       }
@@ -227,6 +265,22 @@ export const TodoEditScreen: React.FC = () => {
           <View style={styles.field}>
             <Text style={styles.label}>Nhắc nhở</Text>
             <ReminderPicker reminderAt={reminderAt} onReminderChange={setReminderAt} />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Lặp lại</Text>
+            <RecurrencePicker
+              pattern={recurrencePattern}
+              interval={recurrenceInterval}
+              endDate={recurrenceEndDate}
+              endCount={recurrenceEndCount}
+              endType={recurrenceEndType}
+              onPatternChange={setRecurrencePattern}
+              onIntervalChange={setRecurrenceInterval}
+              onEndDateChange={setRecurrenceEndDate}
+              onEndCountChange={setRecurrenceEndCount}
+              onEndTypeChange={setRecurrenceEndType}
+            />
           </View>
 
           <View style={styles.field}>

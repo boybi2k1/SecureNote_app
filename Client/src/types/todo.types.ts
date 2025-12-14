@@ -27,6 +27,14 @@ export interface Todo {
   deleted_at?: string;
   is_shared: boolean;
   linked_note_id?: number;
+  // Recurrence fields
+  recurrence_pattern?: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
+  recurrence_interval?: number;
+  recurrence_end_date?: string;
+  recurrence_count?: number;
+  parent_todo_id?: number;
+  next_occurrence_date?: string;
+  is_recurring_template?: boolean;
   created_at: string;
   updated_at: string;
   tag_ids: number[];
@@ -45,6 +53,11 @@ export interface CreateTodoDto {
   category_id?: number | null; // Optional
   tag_ids?: number[]; // Optional
   linked_note_id?: number | null; // Optional
+  // Recurrence fields
+  recurrence_pattern?: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
+  recurrence_interval?: number;
+  recurrence_end_date?: string;
+  recurrence_count?: number;
 }
 
 export interface UpdateTodoDto {
@@ -57,6 +70,11 @@ export interface UpdateTodoDto {
   category_id?: number | null; // Optional, 0 để xóa category
   tag_ids?: number[]; // Optional, [] để xóa tất cả tags
   linked_note_id?: number | null; // Optional, 0 để xóa link
+  // Recurrence fields
+  recurrence_pattern?: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom' | null;
+  recurrence_interval?: number;
+  recurrence_end_date?: string | null;
+  recurrence_count?: number;
 }
 
 export interface TodoFilters {

@@ -27,6 +27,7 @@ export type AppStackParamList = {
   TodoEdit: { todoId?: number };
   CategoriesList: undefined;
   CategoryEdit: { categoryId?: number };
+  Calendar: undefined;
   Trash: undefined;
   ShareNote: { noteId: number };
   SharedNotes: undefined;
@@ -131,17 +132,30 @@ export const NotesListScreen: React.FC = () => {
     navigation.navigate('TodosList');
   };
 
-  // Set header options với nút Settings
+  const handleCalendarPress = () => {
+    navigation.navigate('Calendar');
+  };
+
+  // Set header options với nút Settings và Calendar
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <TouchableOpacity
-          onPress={handleSettingsPress}
-          style={styles.settingsButton}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text style={styles.settingsButtonText}>⚙️</Text>
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            onPress={handleCalendarPress}
+            style={styles.headerButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.headerButtonText}>📅</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleSettingsPress}
+            style={styles.headerButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.headerButtonText}>⚙️</Text>
+          </TouchableOpacity>
+        </View>
       ),
     });
   }, [navigation]);
@@ -310,6 +324,20 @@ const styles = StyleSheet.create({
     fontSize: 32,
     color: '#fff',
     fontWeight: '300',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginRight: 8,
+  },
+  headerButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  headerButtonText: {
+    color: '#fff',
+    fontSize: 20,
   },
   settingsButton: {
     marginRight: 16,

@@ -11,6 +11,7 @@ import { AppNavigator } from './src/navigation/AppNavigator';
 import { AppStackParamList } from './src/screens/Notes/NotesListScreen';
 import { notificationService } from './src/services/notificationService';
 import { reminderCheckerService } from './src/services/reminderChecker';
+import { todosService } from './src/services/todosService';
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -36,9 +37,19 @@ const AppContent: React.FC = () => {
     }
   }, [isAuthenticated]);
 
-  // Start checking reminders when authenticated
+  // Start checking reminders and generate recurring instances when authenticated
   useEffect(() => {
     if (isAuthenticated) {
+      // Generate recurring instances when app opens
+      const generateInstances = async () => {
+        try {
+          await todosService.generateRecurringInstances();
+        } catch (error) {
+          console.warn('Error generating recurring instances:', error);
+        }
+      };
+      generateInstances();
+
       // Clear old checked reminders
       reminderCheckerService.clearCheckedReminders();
       // Start checking every 30 seconds (more frequent for Expo Go)

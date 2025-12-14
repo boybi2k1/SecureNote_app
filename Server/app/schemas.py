@@ -217,6 +217,11 @@ class TodoBase(BaseModel):
     category_id: Optional[int] = None
     tag_ids: Optional[List[int]] = []
     linked_note_id: Optional[int] = None
+    # Recurrence fields
+    recurrence_pattern: Optional[str] = Field(None, pattern="^(daily|weekly|monthly|yearly|custom)$")
+    recurrence_interval: Optional[int] = Field(1, ge=1)  # Minimum 1
+    recurrence_end_date: Optional[datetime] = None
+    recurrence_count: Optional[int] = Field(None, ge=1)  # Minimum 1 occurrence
 
 
 class TodoCreate(TodoBase):
@@ -233,6 +238,11 @@ class TodoUpdate(BaseModel):
     category_id: Optional[int] = None
     tag_ids: Optional[List[int]] = None
     linked_note_id: Optional[int] = None
+    # Recurrence fields
+    recurrence_pattern: Optional[str] = Field(None, pattern="^(daily|weekly|monthly|yearly|custom)$")
+    recurrence_interval: Optional[int] = Field(None, ge=1)
+    recurrence_end_date: Optional[datetime] = None
+    recurrence_count: Optional[int] = Field(None, ge=1)
 
 
 class TodoResponse(TodoBase):
@@ -244,6 +254,14 @@ class TodoResponse(TodoBase):
     is_deleted: bool
     deleted_at: Optional[datetime] = None
     is_shared: bool
+    # Recurrence fields
+    recurrence_pattern: Optional[str] = None
+    recurrence_interval: Optional[int] = None
+    recurrence_end_date: Optional[datetime] = None
+    recurrence_count: Optional[int] = None
+    parent_todo_id: Optional[int] = None
+    next_occurrence_date: Optional[datetime] = None
+    is_recurring_template: bool = False
     created_at: datetime
     updated_at: datetime
     category: Optional[CategoryResponse] = None

@@ -10,6 +10,19 @@ import {
 } from '../types/todo.types';
 
 export const todosService = {
+  /**
+   * Generate recurring todo instances
+   * Should be called when app opens or periodically
+   */
+  async generateRecurringInstances(): Promise<{ message: string; count: number }> {
+    try {
+      const response = await api.post('/todos/recurring/generate-instances');
+      return response.data;
+    } catch (error: any) {
+      console.error('Error generating recurring instances:', error);
+      throw error;
+    }
+  },
   async getTodos(filters?: TodoFilters): Promise<Todo[]> {
     const params = new URLSearchParams();
 

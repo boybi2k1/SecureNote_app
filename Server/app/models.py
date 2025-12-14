@@ -169,6 +169,15 @@ class Todo(Base):
     # Link to note (optional)
     linked_note_id = Column(Integer, ForeignKey("notes.id", ondelete="SET NULL"), nullable=True)
     
+    # Recurrence fields
+    recurrence_pattern = Column(String(20), nullable=True)  # daily, weekly, monthly, yearly, custom
+    recurrence_interval = Column(Integer, default=1)  # Every X days/weeks/months
+    recurrence_end_date = Column(DateTime(timezone=True), nullable=True)  # End date for recurrence
+    recurrence_count = Column(Integer, nullable=True)  # Number of occurrences
+    parent_todo_id = Column(Integer, ForeignKey("todos.id", ondelete="CASCADE"), nullable=True)  # Parent recurring template
+    next_occurrence_date = Column(DateTime(timezone=True), nullable=True)  # When to create next instance
+    is_recurring_template = Column(Boolean, default=False)  # Is this a recurring template
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
@@ -177,6 +186,7 @@ class Todo(Base):
     category = relationship("Category", back_populates="todos")
     tags = relationship("Tag", secondary="todo_tags", back_populates="todos")
     subtasks = relationship("TodoItem", back_populates="todo", cascade="all, delete-orphan", order_by="TodoItem.order")
+    parent_todo = relationship("Todo", remote_side=[id], backref="child_todos")  # Self-referential for recurring todos
     linked_note = relationship("Note", foreign_keys=[linked_note_id])
     
     __table_args__ = (
