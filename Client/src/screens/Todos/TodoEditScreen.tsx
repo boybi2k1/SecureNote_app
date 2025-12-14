@@ -17,9 +17,12 @@ import { useTodos } from '../../context/TodosContext';
 import { todosService } from '../../services/todosService';
 import { CategoryPicker } from '../../components/CategoryPicker';
 import { TagInput } from '../../components/TagInput';
+import { ReminderPicker } from '../../components/ReminderPicker';
+import { DueDatePicker } from '../../components/DueDatePicker';
 import { AppStackParamList } from '../Notes/NotesListScreen';
 import { CreateTodoDto, UpdateTodoDto } from '../../types/todo.types';
 import { Tag } from '../../types/tag.types';
+import { toLocalISOString, parseServerDateTime } from '../../utils/dateUtils';
 
 type TodoEditScreenRouteProp = RouteProp<AppStackParamList, 'TodoEdit'>;
 type TodoEditScreenNavigationProp = StackNavigationProp<AppStackParamList, 'TodoEdit'>;
@@ -34,6 +37,8 @@ export const TodoEditScreen: React.FC = () => {
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<'pending' | 'in_progress' | 'completed'>('pending');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
+  const [dueDate, setDueDate] = useState<Date | null>(null);
+  const [reminderAt, setReminderAt] = useState<Date | null>(null);
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [originalTags, setOriginalTags] = useState<Tag[]>([]);
@@ -61,6 +66,8 @@ export const TodoEditScreen: React.FC = () => {
       setDescription(todo.description || '');
       setStatus(todo.status);
       setPriority(todo.priority);
+      setDueDate(todo.due_date ? parseServerDateTime(todo.due_date) : null);
+      setReminderAt(todo.reminder_at ? parseServerDateTime(todo.reminder_at) : null);
       setCategoryId(todo.category_id);
       const todoTags = todo.tags || [];
       setSelectedTags(todoTags);
@@ -90,6 +97,8 @@ export const TodoEditScreen: React.FC = () => {
           description: description.trim() || undefined,
           status,
           priority,
+          due_date: dueDate ? toLocalISOString(dueDate) : undefined,
+          reminder_at: reminderAt ? toLocalISOString(reminderAt) : undefined,
           category_id: categoryId || undefined,
           tag_ids: tagIds.length > 0 ? tagIds : [],
         };
@@ -100,6 +109,8 @@ export const TodoEditScreen: React.FC = () => {
           description: description.trim() || undefined,
           status,
           priority,
+          due_date: dueDate ? toLocalISOString(dueDate) : undefined,
+          reminder_at: reminderAt ? toLocalISOString(reminderAt) : undefined,
           category_id: categoryId || undefined,
           tag_ids: tagIds.length > 0 ? tagIds : undefined,
         };
@@ -206,6 +217,16 @@ export const TodoEditScreen: React.FC = () => {
                 </TouchableOpacity>
               ))}
             </View>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Hạn chót</Text>
+            <DueDatePicker dueDate={dueDate} onDueDateChange={setDueDate} />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Nhắc nhở</Text>
+            <ReminderPicker reminderAt={reminderAt} onReminderChange={setReminderAt} />
           </View>
 
           <View style={styles.field}>

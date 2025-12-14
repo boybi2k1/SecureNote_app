@@ -14,6 +14,7 @@ import { useTodos } from '../../context/TodosContext';
 import { TodoCard } from '../../components/TodoCard';
 import { SearchBar } from '../../components/SearchBar';
 import { FilterBar } from '../../components/FilterBar';
+import { UpcomingReminders } from '../../components/UpcomingReminders';
 import { Todo, TodoFilters } from '../../types/todo.types';
 import { AppStackParamList } from '../Notes/NotesListScreen';
 
@@ -118,6 +119,7 @@ export const TodosListScreen: React.FC = () => {
     <View style={styles.container}>
       <SearchBar onSearch={handleSearch} placeholder="Tìm kiếm todo..." />
       <FilterBar filters={filters} onFiltersChange={handleFiltersChange} />
+      <UpcomingReminders />
 
       <FlatList
         data={todos}

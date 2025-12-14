@@ -9,6 +9,7 @@ import {
   UpdateTodoItemDto,
 } from '../types/todo.types';
 import { todosService } from '../services/todosService';
+import { notificationService } from '../services/notificationService';
 
 interface TodosContextType {
   todos: Todo[];
@@ -51,6 +52,23 @@ export const TodosProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         category: todo.category_id === null ? null : todo.category,
       }));
       setTodos(normalizedData);
+
+      // Re-schedule notifications for todos with reminders (only if not fetching deleted todos)
+      if (!filters?.is_deleted) {
+        for (const todo of normalizedData) {
+          if (todo.reminder_at && !todo.is_completed) {
+            const reminderDate = new Date(todo.reminder_at);
+            if (reminderDate > new Date()) {
+              await notificationService.scheduleNotification(
+                todo.id,
+                todo.title,
+                reminderDate,
+                todo.description
+              );
+            }
+          }
+        }
+      }
     } catch (err: any) {
       const errorMessage =
         err.response?.data?.detail || err.message || 'Không thể tải danh sách todo';
@@ -71,6 +89,18 @@ export const TodosProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         category: newTodo.category_id === null ? null : newTodo.category,
       };
       setTodos((prev) => [normalizedTodo, ...prev]);
+
+      // Schedule notification if reminder_at is set
+      if (newTodo.reminder_at && !newTodo.is_completed) {
+        const reminderDate = new Date(newTodo.reminder_at);
+        await notificationService.scheduleNotification(
+          newTodo.id,
+          newTodo.title,
+          reminderDate,
+          newTodo.description
+        );
+      }
+
       return normalizedTodo;
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || err.message || 'Không thể tạo todo';
@@ -89,6 +119,25 @@ export const TodosProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         category: updatedTodo.category_id === null ? null : updatedTodo.category,
       };
       setTodos((prev) => prev.map((t) => (t.id === id ? normalizedTodo : t)));
+
+      // Update notification
+      if (updatedTodo.is_completed) {
+        // Cancel notification if todo is completed
+        await notificationService.cancelNotification(id);
+      } else if (updatedTodo.reminder_at) {
+        // Update notification if reminder_at is set
+        const reminderDate = new Date(updatedTodo.reminder_at);
+        await notificationService.updateNotification(
+          id,
+          updatedTodo.title,
+          reminderDate,
+          updatedTodo.description
+        );
+      } else {
+        // Cancel notification if reminder_at is removed
+        await notificationService.cancelNotification(id);
+      }
+
       return normalizedTodo;
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || err.message || 'Không thể cập nhật todo';
@@ -102,6 +151,8 @@ export const TodosProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setError(null);
       await todosService.deleteTodo(id);
       setTodos((prev) => prev.filter((t) => t.id !== id));
+      // Cancel notification when todo is deleted
+      await notificationService.cancelNotification(id);
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || err.message || 'Không thể xóa todo';
       setError(errorMessage);
@@ -113,6 +164,10 @@ export const TodosProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     try {
       setError(null);
       const response = await todosService.toggleComplete(id);
+      
+      // Get current todo before updating state
+      const currentTodo = todos.find((t) => t.id === id);
+      
       setTodos((prev) =>
         prev.map((t) =>
           t.id === id
@@ -120,6 +175,24 @@ export const TodosProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             : t
         )
       );
+
+      // Cancel notification if todo is completed
+      if (response.is_completed) {
+        await notificationService.cancelNotification(id);
+      } else {
+        // Re-schedule notification if todo is uncompleted and has reminder
+        if (currentTodo && currentTodo.reminder_at) {
+          const reminderDate = new Date(currentTodo.reminder_at);
+          if (reminderDate > new Date()) {
+            await notificationService.scheduleNotification(
+              id,
+              currentTodo.title,
+              reminderDate,
+              currentTodo.description
+            );
+          }
+        }
+      }
     } catch (err: any) {
       const errorMessage =
         err.response?.data?.detail || err.message || 'Không thể cập nhật trạng thái';
@@ -176,6 +249,8 @@ export const TodosProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       await todosService.permanentDeleteTodo(id);
       // Xóa todo khỏi danh sách
       setTodos((prev) => prev.filter((t) => t.id !== id));
+      // Cancel notification
+      await notificationService.cancelNotification(id);
     } catch (err: any) {
       const errorMessage =
         err.response?.data?.detail || err.message || 'Không thể xóa vĩnh viễn todo';

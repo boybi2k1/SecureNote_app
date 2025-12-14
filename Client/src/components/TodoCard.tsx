@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Todo } from '../types/todo.types';
+import { parseServerDateTime, formatDateTime } from '../utils/dateUtils';
 
 interface TodoCardProps {
   todo: Todo;
@@ -38,7 +39,8 @@ const getStatusText = (status: string) => {
 export const TodoCard: React.FC<TodoCardProps> = ({ todo, onPress }) => {
   const formatDate = (dateString?: string) => {
     if (!dateString) return null;
-    const date = new Date(dateString);
+    const date = parseServerDateTime(dateString);
+    if (!date) return null;
     return date.toLocaleDateString('vi-VN', {
       day: '2-digit',
       month: '2-digit',
@@ -46,7 +48,10 @@ export const TodoCard: React.FC<TodoCardProps> = ({ todo, onPress }) => {
     });
   };
 
-  const isOverdue = todo.due_date && new Date(todo.due_date) < new Date() && !todo.is_completed;
+  const isOverdue = todo.due_date && (() => {
+    const dueDate = parseServerDateTime(todo.due_date);
+    return dueDate ? dueDate < new Date() && !todo.is_completed : false;
+  })();
   const priorityColor = getPriorityColor(todo.priority);
   const progress =
     todo.subtasks && todo.subtasks.length > 0
