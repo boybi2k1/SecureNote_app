@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     MASTER_KEY: str = ""  # 32 bytes for AES-256
     DATABASE_URL: str = "sqlite:///./secure_notes.db"
     CORS_ORIGINS: str = "http://localhost:3000,*"
+    GEMINI_API_KEY: str = ""
     
     class Config:
         env_file = ".env"

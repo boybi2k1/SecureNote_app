@@ -10,6 +10,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -19,9 +20,11 @@ import { tagsService } from '../../services/tagsService';
 import { validation } from '../../utils/validation';
 import { CategoryPicker } from '../../components/CategoryPicker';
 import { TagInput } from '../../components/TagInput';
+import { ImagePickerComponent } from '../../components/ImagePicker';
 import { AppStackParamList } from './NotesListScreen';
 import { CreateNoteDto, UpdateNoteDto } from '../../types/note.types';
 import { Tag } from '../../types/tag.types';
+import { ocrService } from '../../services/ocrService';
 
 type NoteEditScreenRouteProp = RouteProp<AppStackParamList, 'NoteEdit'>;
 type NoteEditScreenNavigationProp = StackNavigationProp<AppStackParamList, 'NoteEdit'>;
@@ -39,6 +42,8 @@ export const NoteEditScreen: React.FC = () => {
   const [originalTags, setOriginalTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showImagePicker, setShowImagePicker] = useState(false);
+  const [ocrProcessing, setOcrProcessing] = useState(false);
 
   const isEditMode = !!noteId;
 
@@ -182,6 +187,30 @@ export const NoteEditScreen: React.FC = () => {
     }
   };
 
+  const handleImageSelected = async (imageUri: string) => {
+    try {
+      setOcrProcessing(true);
+      const result = await ocrService.extractTextFromImage(imageUri);
+
+      if (result.success) {
+        setTitle(result.title);
+        setContent(result.content);
+        Alert.alert('Thành công', 'Đã trích xuất text từ ảnh');
+      } else {
+        Alert.alert('Lỗi', 'Không thể trích xuất text từ ảnh');
+      }
+    } catch (error: any) {
+      console.error('OCR error:', error);
+      Alert.alert(
+        'Lỗi',
+        error.response?.data?.detail || error.message || 'Không thể OCR ảnh'
+      );
+    } finally {
+      setOcrProcessing(false);
+      setShowImagePicker(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -242,6 +271,16 @@ export const NoteEditScreen: React.FC = () => {
             selectedTags={selectedTags}
             onTagsChange={setSelectedTags}
           />
+
+          <TouchableOpacity
+            style={styles.ocrButton}
+            onPress={() => setShowImagePicker(true)}
+            disabled={ocrProcessing || saving}
+          >
+            <Text style={styles.ocrButtonText}>
+              {ocrProcessing ? '⏳ Đang OCR...' : '📷 Tạo note từ ảnh'}
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
@@ -265,6 +304,25 @@ export const NoteEditScreen: React.FC = () => {
           )}
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={showImagePicker}
+        animationType="slide"
+        onRequestClose={() => setShowImagePicker(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Chọn ảnh để OCR</Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowImagePicker(false)}
+            >
+              <Text style={styles.closeButtonText}>✕ Đóng</Text>
+            </TouchableOpacity>
+          </View>
+          <ImagePickerComponent onImageSelected={handleImageSelected} />
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -354,6 +412,45 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  ocrButton: {
+    backgroundColor: '#9b59b6',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  ocrButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  closeButton: {
+    padding: 8,
+  },
+  closeButtonText: {
+    fontSize: 18,
+    color: '#007AFF',
     fontWeight: '600',
   },
 });

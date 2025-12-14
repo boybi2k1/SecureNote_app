@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from typing import Optional, List
@@ -9,6 +9,7 @@ from app.security import (
     decrypt_user_key, encrypt_note_data, decrypt_note_data, settings
 )
 from app.api.deps import get_current_user
+from app.services.ocr_service import extract_text_from_image, generate_title_from_content
 
 router = APIRouter()
 
@@ -269,6 +270,81 @@ async def create_note(
         "tags": db_note.tags
     }
     return NoteResponse(**note_dict)
+
+
+@router.post("/ocr")
+async def ocr_image_to_note(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    OCR ảnh và trả về text để tạo note
+    """
+    file_content = None
+    try:
+        # Validate file type
+        if not file.content_type or not file.content_type.startswith('image/'):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File phải là ảnh (jpg, png, etc.)"
+            )
+        
+        # Validate file size (max 10MB)
+        MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+        file_content = await file.read()
+        
+        # Đảm bảo file được đóng
+        await file.close()
+        
+        if len(file_content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File quá lớn. Kích thước tối đa là 10MB"
+            )
+        
+        # OCR để lấy nội dung
+        try:
+            extracted_text = await extract_text_from_image(file_content)
+        except Exception as e:
+            import traceback
+            error_detail = str(e)
+            traceback.print_exc()  # Log full traceback để debug
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Lỗi OCR: {error_detail}"
+            )
+        
+        # Nội dung là toàn bộ text OCR được
+        content = extracted_text.strip()
+        
+        # Sử dụng AI để tạo tiêu đề từ nội dung
+        try:
+            title = await generate_title_from_content(content)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            # Nếu lỗi khi tạo title, dùng title mặc định
+            title = "Note từ ảnh"
+        
+        return {
+            "title": title,
+            "content": content,
+            "success": True
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi xử lý: {str(e)}"
+        )
+    finally:
+        # Đảm bảo cleanup
+        if file_content:
+            del file_content
 
 
 @router.put("/{note_id}", response_model=NoteResponse)
