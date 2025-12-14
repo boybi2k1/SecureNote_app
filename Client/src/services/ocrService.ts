@@ -1,4 +1,5 @@
-import api from './api';
+import { API_BASE_URL } from '../utils/constants';
+import { storageService } from './storageService';
 
 export interface OCRResponse {
   title: string;
@@ -12,6 +13,12 @@ export const ocrService = {
     
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
+        // Lấy token để authenticate
+        const tokens = await storageService.getTokens();
+        if (!tokens?.accessToken) {
+          throw new Error('Không có token xác thực');
+        }
+        
         const formData = new FormData();
         
         // Tạo file object từ URI
@@ -25,23 +32,44 @@ export const ocrService = {
           type: type,
         } as any);
         
-        const response = await api.post<OCRResponse>('/notes/ocr', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          timeout: 120000, // 120 giây (2 phút) cho OCR và tạo title
-        });
+        // Sử dụng fetch API thay vì axios để xử lý FormData tốt hơn trong React Native
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 giây timeout
         
-        return response.data;
+        try {
+          const response = await fetch(`${API_BASE_URL}/notes/ocr`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${tokens.accessToken}`,
+              // Không set Content-Type, để fetch tự động set với boundary
+            },
+            body: formData,
+            signal: controller.signal,
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'Lỗi không xác định' }));
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+          }
+          
+          const data: OCRResponse = await response.json();
+          return data;
+        } catch (fetchError: any) {
+          clearTimeout(timeoutId);
+          throw fetchError;
+        }
       } catch (error: any) {
         lastError = error;
         
         // Nếu là lỗi network và còn retry, đợi một chút rồi thử lại
         if (
           attempt < retries &&
-          (error.code === 'ERR_NETWORK' ||
+          (error.name === 'AbortError' ||
            error.message?.includes('Network') ||
-           error.message?.includes('Stream Closed'))
+           error.message?.includes('Stream Closed') ||
+           error.message?.includes('Failed to fetch'))
         ) {
           console.log(`OCR attempt ${attempt + 1} failed, retrying...`);
           // Đợi 1 giây trước khi retry

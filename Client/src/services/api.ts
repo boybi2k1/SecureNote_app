@@ -18,6 +18,32 @@ api.interceptors.request.use(
     if (tokens?.accessToken && config.headers) {
       config.headers.Authorization = `Bearer ${tokens.accessToken}`;
     }
+    
+    // Nếu đang gửi FormData, xóa hoàn toàn Content-Type để axios tự động set với boundary
+    // Trong React Native, FormData cần được xử lý đặc biệt
+    if (config.data instanceof FormData) {
+      // Xóa Content-Type từ tất cả các nơi có thể
+      if (config.headers) {
+        delete config.headers['Content-Type'];
+        delete config.headers['content-type'];
+        // Đảm bảo không có Content-Type nào được set
+        config.headers['Content-Type'] = undefined as any;
+      }
+      // Đảm bảo axios không tự động set Content-Type từ default
+      if (config.headers && 'common' in config.headers) {
+        delete (config.headers as any).common['Content-Type'];
+      }
+      // Đảm bảo axios nhận diện đây là FormData
+      if (!config.transformRequest) {
+        config.transformRequest = [(data) => {
+          if (data instanceof FormData) {
+            return data;
+          }
+          return data;
+        }];
+      }
+    }
+    
     return config;
   },
   (error) => {
