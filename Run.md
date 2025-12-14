@@ -34,6 +34,8 @@ Tạo file .env (nếu chưa có):
 
 Chạy server:
 ```powershell
+cd Server
+.\venv\Scripts\Activate.ps1
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 

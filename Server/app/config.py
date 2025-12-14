@@ -33,25 +33,29 @@ class Settings(BaseSettings):
             print("WARNING: SECRET_KEY not set in .env, using generated key for development")
         
         if not self.MASTER_KEY:
-            # Generate 32 bytes (256 bits) for AES-256
-            import base64
-            key_bytes = secrets.token_bytes(32)
-            # Encode to base64 (44 chars) - full encoding for better compatibility
-            self.MASTER_KEY = base64.b64encode(key_bytes).decode('utf-8')
             print("=" * 80)
-            print("CRITICAL WARNING: MASTER_KEY not set in .env file!")
-            print("A new master key has been generated for this session.")
-            print("This means:")
-            print("  - All existing user encryption keys CANNOT be decrypted")
-            print("  - Users will NOT be able to access their encrypted notes")
-            print("  - This master key will change on every server restart")
+            print("ERROR: MASTER_KEY is not set in .env file!")
+            print("=" * 80)
+            print("")
+            print("MASTER_KEY is required and must be set in .env file.")
+            print("This key is used to encrypt/decrypt user encryption keys.")
             print("")
             print("SOLUTION:")
-            print("  1. Create a .env file in the server directory")
-            print("  2. Add: MASTER_KEY=<your-fixed-32-byte-key>")
-            print("  3. Use the same MASTER_KEY that was used when users were created")
-            print("  4. Or recreate all users with the new master key")
+            print("  1. Create a .env file in the Server directory")
+            print("  2. Run: python create_env.py")
+            print("     OR manually add: MASTER_KEY=<your-32-byte-key>")
+            print("  3. The MASTER_KEY must be exactly 32 bytes (44 chars base64)")
+            print("  4. Keep the same MASTER_KEY across all server restarts")
+            print("")
+            print("IMPORTANT:")
+            print("  - If you change MASTER_KEY, all existing users will lose access")
+            print("  - Backup your .env file in a secure location")
             print("=" * 80)
+            raise ValueError(
+                "MASTER_KEY is not set in .env file. "
+                "Please create .env file with MASTER_KEY. "
+                "Run 'python create_env.py' to generate one."
+            )
         
         # MASTER_KEY will be handled by get_master_key_bytes() in security.py
         # It can be stored as base64-encoded string or raw string
