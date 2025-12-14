@@ -92,18 +92,25 @@ async def generate_title_from_content(content: str) -> str:
         
         # Prompt để tạo tiêu đề
         prompt = f"""
-        Dựa vào nội dung sau đây, hãy tạo một tiêu đề ngắn gọn, súc tích và mô tả chính xác nội dung.
-        Tiêu đề phải:
-        - Ngắn gọn (tối đa 50 ký tự)
+        Bạn là một trợ lý tạo tiêu đề thông minh. Nhiệm vụ của bạn là tạo một tiêu đề ngắn gọn từ nội dung được cung cấp.
+        
+        QUAN TRỌNG: Tiêu đề PHẢI được viết bằng CÙNG NGÔN NGỮ với nội dung. 
+        - Nếu nội dung là tiếng Việt, tiêu đề phải là tiếng Việt
+        - Nếu nội dung là tiếng Anh, tiêu đề phải là tiếng Anh
+        - Nếu nội dung là tiếng Nhật, tiêu đề phải là tiếng Nhật
+        - Và tương tự cho các ngôn ngữ khác
+        
+        Yêu cầu về tiêu đề:
+        - Ngắn gọn, súc tích (tối đa 50 ký tự)
         - Mô tả chính xác nội dung chính
         - Dễ hiểu và rõ ràng
         - Không có dấu ngoặc kép, không có ký tự đặc biệt ở đầu/cuối
-        - Tiêu đề phải cùng ngôn ngữ với nội dung
+        - PHẢI cùng ngôn ngữ với nội dung (quan trọng nhất)
         
-        Chỉ trả về tiêu đề, không có giải thích hay comment gì thêm.
+        Chỉ trả về tiêu đề, không có giải thích, không có comment, không có dấu ngoặc kép bao quanh.
         
         Nội dung:
-        {content[:2000]}  # Giới hạn để tránh quá dài
+        {content[:2000]}
         """
         
         try:
