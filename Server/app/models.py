@@ -17,6 +17,7 @@ class User(Base):
     
     # Relationships
     notes = relationship("Note", back_populates="owner", cascade="all, delete-orphan")
+    todos = relationship("Todo", back_populates="owner", cascade="all, delete-orphan")
     categories = relationship("Category", back_populates="owner", cascade="all, delete-orphan")
     tags = relationship("Tag", back_populates="owner", cascade="all, delete-orphan")
     shared_notes_owned = relationship("SharedNote", foreign_keys="SharedNote.owner_id", back_populates="owner")
@@ -36,6 +37,7 @@ class Category(Base):
     # Relationships
     owner = relationship("User", back_populates="categories")
     notes = relationship("Note", back_populates="category")
+    todos = relationship("Todo", back_populates="category")
     
     __table_args__ = (
         {"sqlite_autoincrement": True},
@@ -53,6 +55,7 @@ class Tag(Base):
     # Relationships
     owner = relationship("User", back_populates="tags")
     notes = relationship("Note", secondary="note_tags", back_populates="tags")
+    todos = relationship("Todo", secondary="todo_tags", back_populates="tags")
     
     __table_args__ = (
         {"sqlite_autoincrement": True},
@@ -132,6 +135,84 @@ class RefreshToken(Base):
     
     # Relationships
     user = relationship("User", back_populates="refresh_tokens")
+
+
+class Todo(Base):
+    __tablename__ = "todos"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    
+    # Encrypted fields
+    title_encrypted = Column(Text, nullable=False)
+    title_nonce = Column(Text, nullable=False)
+    title_tag = Column(Text, nullable=False)
+    description_encrypted = Column(Text, nullable=True)
+    description_nonce = Column(Text, nullable=True)
+    description_tag = Column(Text, nullable=True)
+    
+    # Todo-specific fields
+    status = Column(String(20), default="pending")  # pending, in_progress, completed
+    priority = Column(String(10), default="medium")  # low, medium, high, urgent
+    due_date = Column(DateTime(timezone=True), nullable=True)
+    reminder_at = Column(DateTime(timezone=True), nullable=True)
+    is_completed = Column(Boolean, default=False)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Metadata
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
+    is_favorite = Column(Boolean, default=False)
+    is_deleted = Column(Boolean, default=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    is_shared = Column(Boolean, default=False)
+    
+    # Link to note (optional)
+    linked_note_id = Column(Integer, ForeignKey("notes.id", ondelete="SET NULL"), nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    owner = relationship("User", back_populates="todos")
+    category = relationship("Category", back_populates="todos")
+    tags = relationship("Tag", secondary="todo_tags", back_populates="todos")
+    subtasks = relationship("TodoItem", back_populates="todo", cascade="all, delete-orphan", order_by="TodoItem.order")
+    linked_note = relationship("Note", foreign_keys=[linked_note_id])
+    
+    __table_args__ = (
+        {"sqlite_autoincrement": True},
+    )
+
+
+class TodoItem(Base):
+    __tablename__ = "todo_items"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    todo_id = Column(Integer, ForeignKey("todos.id", ondelete="CASCADE"), nullable=False)
+    
+    # Encrypted
+    title_encrypted = Column(Text, nullable=False)
+    title_nonce = Column(Text, nullable=False)
+    title_tag = Column(Text, nullable=False)
+    
+    is_completed = Column(Boolean, default=False)
+    order = Column(Integer, default=0)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    todo = relationship("Todo", back_populates="subtasks")
+    
+    __table_args__ = (
+        {"sqlite_autoincrement": True},
+    )
+
+
+class TodoTag(Base):
+    __tablename__ = "todo_tags"
+    
+    todo_id = Column(Integer, ForeignKey("todos.id", ondelete="CASCADE"), primary_key=True)
+    tag_id = Column(Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True)
 
 
 

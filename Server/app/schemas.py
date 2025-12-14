@@ -179,3 +179,78 @@ class UserSettingsResponse(UserSettings):
     pass
 
 
+# Todo Item Schemas
+class TodoItemBase(BaseModel):
+    title: str = Field(..., min_length=1, max_length=500)
+
+
+class TodoItemCreate(TodoItemBase):
+    order: Optional[int] = 0
+
+
+class TodoItemUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=500)
+    is_completed: Optional[bool] = None
+    order: Optional[int] = None
+
+
+class TodoItemResponse(TodoItemBase):
+    id: int
+    todo_id: int
+    is_completed: bool
+    order: int
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# Todo Schemas
+class TodoBase(BaseModel):
+    title: str = Field(..., min_length=1, max_length=500)
+    description: Optional[str] = Field(None, max_length=10000)
+    status: str = Field(default="pending", pattern="^(pending|in_progress|completed)$")
+    priority: str = Field(default="medium", pattern="^(low|medium|high|urgent)$")
+    due_date: Optional[datetime] = None
+    reminder_at: Optional[datetime] = None
+    category_id: Optional[int] = None
+    tag_ids: Optional[List[int]] = []
+    linked_note_id: Optional[int] = None
+
+
+class TodoCreate(TodoBase):
+    pass
+
+
+class TodoUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=500)
+    description: Optional[str] = Field(None, max_length=10000)
+    status: Optional[str] = Field(None, pattern="^(pending|in_progress|completed)$")
+    priority: Optional[str] = Field(None, pattern="^(low|medium|high|urgent)$")
+    due_date: Optional[datetime] = None
+    reminder_at: Optional[datetime] = None
+    category_id: Optional[int] = None
+    tag_ids: Optional[List[int]] = None
+    linked_note_id: Optional[int] = None
+
+
+class TodoResponse(TodoBase):
+    id: int
+    user_id: int
+    is_completed: bool
+    completed_at: Optional[datetime] = None
+    is_favorite: bool
+    is_deleted: bool
+    deleted_at: Optional[datetime] = None
+    is_shared: bool
+    created_at: datetime
+    updated_at: datetime
+    category: Optional[CategoryResponse] = None
+    tags: List[TagResponse] = []
+    subtasks: List[TodoItemResponse] = []
+    
+    class Config:
+        from_attributes = True
+
+

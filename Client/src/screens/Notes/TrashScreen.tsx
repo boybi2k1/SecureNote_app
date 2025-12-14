@@ -12,9 +12,13 @@ import {
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useNotes } from '../../context/NotesContext';
+import { useTodos } from '../../context/TodosContext';
 import { notesService } from '../../services/notesService';
+import { todosService } from '../../services/todosService';
 import { NoteCard } from '../../components/NoteCard';
+import { TodoCard } from '../../components/TodoCard';
 import { Note } from '../../types/note.types';
+import { Todo } from '../../types/todo.types';
 import { AppStackParamList } from './NotesListScreen';
 
 type TrashScreenNavigationProp = StackNavigationProp<AppStackParamList, 'Trash'>;
@@ -22,9 +26,12 @@ type TrashScreenNavigationProp = StackNavigationProp<AppStackParamList, 'Trash'>
 export const TrashScreen: React.FC = () => {
   const navigation = useNavigation<TrashScreenNavigationProp>();
   const { restoreNote, permanentDeleteNote } = useNotes();
+  const { restoreTodo, permanentDeleteTodo } = useTodos();
   const [trashNotes, setTrashNotes] = useState<Note[]>([]);
+  const [trashTodos, setTrashTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'notes' | 'todos'>('notes');
 
   const loadTrashNotes = useCallback(async () => {
     try {
@@ -46,19 +53,43 @@ export const TrashScreen: React.FC = () => {
     }
   }, []);
 
+  const loadTrashTodos = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await todosService.getTrashTodos();
+      // Normalize category
+      const normalizedData = data.map((todo) => ({
+        ...todo,
+        category: todo.category_id === null ? null : todo.category,
+      }));
+      setTrashTodos(normalizedData);
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || err.message || 'Không thể tải thùng rác';
+      setError(errorMessage);
+      console.error('Load trash todos error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadTrash = useCallback(async () => {
+    await Promise.all([loadTrashNotes(), loadTrashTodos()]);
+  }, [loadTrashNotes, loadTrashTodos]);
+
   useEffect(() => {
-    loadTrashNotes();
-  }, [loadTrashNotes]);
+    loadTrash();
+  }, [loadTrash]);
 
   // Tự động reload khi quay lại màn hình
   useFocusEffect(
     useCallback(() => {
-      loadTrashNotes();
-    }, [loadTrashNotes])
+      loadTrash();
+    }, [loadTrash])
   );
 
   const handleRefresh = async () => {
-    await loadTrashNotes();
+    await loadTrash();
   };
 
   const handleNotePress = (note: Note) => {
@@ -101,8 +132,8 @@ export const TrashScreen: React.FC = () => {
           onPress: async () => {
             try {
               await permanentDeleteNote(note.id);
-              // Reload trash notes
-              await loadTrashNotes();
+              // Reload trash
+              await loadTrash();
               Alert.alert('Thành công', 'Ghi chú đã được xóa vĩnh viễn');
             } catch (err: any) {
               Alert.alert('Lỗi', err.response?.data?.detail || err.message || 'Không thể xóa vĩnh viễn ghi chú');
@@ -113,7 +144,58 @@ export const TrashScreen: React.FC = () => {
     );
   };
 
-  if (loading && trashNotes.length === 0) {
+  const handleTodoPress = (todo: Todo) => {
+    navigation.navigate('TodoDetail', { todoId: todo.id });
+  };
+
+  const handleRestoreTodo = (todo: Todo) => {
+    Alert.alert(
+      'Khôi phục todo',
+      `Bạn có chắc chắn muốn khôi phục todo "${todo.title}"?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Khôi phục',
+          onPress: async () => {
+            try {
+              await restoreTodo(todo.id);
+              // Reload trash
+              await loadTrash();
+              Alert.alert('Thành công', 'Todo đã được khôi phục');
+            } catch (err: any) {
+              Alert.alert('Lỗi', err.response?.data?.detail || err.message || 'Không thể khôi phục todo');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handlePermanentDeleteTodo = (todo: Todo) => {
+    Alert.alert(
+      'Xóa vĩnh viễn',
+      `Bạn có chắc chắn muốn xóa vĩnh viễn todo "${todo.title}"? Thao tác này không thể hoàn tác.`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa vĩnh viễn',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await permanentDeleteTodo(todo.id);
+              // Reload trash
+              await loadTrash();
+              Alert.alert('Thành công', 'Todo đã được xóa vĩnh viễn');
+            } catch (err: any) {
+              Alert.alert('Lỗi', err.response?.data?.detail || err.message || 'Không thể xóa vĩnh viễn todo');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  if (loading && trashNotes.length === 0 && trashTodos.length === 0) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
@@ -122,7 +204,7 @@ export const TrashScreen: React.FC = () => {
     );
   }
 
-  if (error && trashNotes.length === 0) {
+  if (error && trashNotes.length === 0 && trashTodos.length === 0) {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>{error}</Text>
@@ -133,47 +215,111 @@ export const TrashScreen: React.FC = () => {
     );
   }
 
+  const currentData = activeTab === 'notes' ? trashNotes : trashTodos;
+  const isEmpty = trashNotes.length === 0 && trashTodos.length === 0;
+
   return (
     <View style={styles.container}>
-      <FlatList
-        data={trashNotes}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.noteContainer}>
-            <TouchableOpacity
-              style={styles.noteCardWrapper}
-              onPress={() => handleNotePress(item)}
-              activeOpacity={0.7}
-            >
-              <NoteCard note={item} onPress={() => handleNotePress(item)} />
-            </TouchableOpacity>
-            <View style={styles.actionsContainer}>
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'notes' && styles.tabActive]}
+          onPress={() => setActiveTab('notes')}
+        >
+          <Text style={[styles.tabText, activeTab === 'notes' && styles.tabTextActive]}>
+            Ghi chú ({trashNotes.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'todos' && styles.tabActive]}
+          onPress={() => setActiveTab('todos')}
+        >
+          <Text style={[styles.tabText, activeTab === 'todos' && styles.tabTextActive]}>
+            Todos ({trashTodos.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {activeTab === 'notes' ? (
+        <FlatList
+          data={trashNotes}
+          keyExtractor={(item) => `note-${item.id}`}
+          renderItem={({ item }) => (
+            <View style={styles.noteContainer}>
               <TouchableOpacity
-                style={[styles.actionButton, styles.restoreButton]}
-                onPress={() => handleRestore(item)}
+                style={styles.noteCardWrapper}
+                onPress={() => handleNotePress(item)}
+                activeOpacity={0.7}
               >
-                <Text style={styles.actionButtonText}>Khôi phục</Text>
+                <NoteCard note={item} onPress={() => handleNotePress(item)} />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.deleteButton]}
-                onPress={() => handlePermanentDelete(item)}
-              >
-                <Text style={styles.actionButtonText}>Xóa vĩnh viễn</Text>
-              </TouchableOpacity>
+              <View style={styles.actionsContainer}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.restoreButton]}
+                  onPress={() => handleRestore(item)}
+                >
+                  <Text style={styles.actionButtonText}>Khôi phục</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.deleteButton]}
+                  onPress={() => handlePermanentDelete(item)}
+                >
+                  <Text style={styles.actionButtonText}>Xóa vĩnh viễn</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        )}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={handleRefresh} />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Thùng rác trống</Text>
-            <Text style={styles.emptySubtext}>Các ghi chú đã xóa sẽ xuất hiện ở đây</Text>
-          </View>
-        }
-      />
+          )}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={loading} onRefresh={handleRefresh} />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Thùng rác trống</Text>
+              <Text style={styles.emptySubtext}>Các ghi chú đã xóa sẽ xuất hiện ở đây</Text>
+            </View>
+          }
+        />
+      ) : (
+        <FlatList
+          data={trashTodos}
+          keyExtractor={(item) => `todo-${item.id}`}
+          renderItem={({ item }) => (
+            <View style={styles.noteContainer}>
+              <TouchableOpacity
+                style={styles.noteCardWrapper}
+                onPress={() => handleTodoPress(item)}
+                activeOpacity={0.7}
+              >
+                <TodoCard todo={item} onPress={() => handleTodoPress(item)} />
+              </TouchableOpacity>
+              <View style={styles.actionsContainer}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.restoreButton]}
+                  onPress={() => handleRestoreTodo(item)}
+                >
+                  <Text style={styles.actionButtonText}>Khôi phục</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.deleteButton]}
+                  onPress={() => handlePermanentDeleteTodo(item)}
+                >
+                  <Text style={styles.actionButtonText}>Xóa vĩnh viễn</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={loading} onRefresh={handleRefresh} />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Thùng rác trống</Text>
+              <Text style={styles.emptySubtext}>Các todo đã xóa sẽ xuất hiện ở đây</Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 };
@@ -182,6 +328,31 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: '#007AFF',
+  },
+  tabText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+  tabTextActive: {
+    color: '#007AFF',
+    fontWeight: '600',
   },
   listContent: {
     padding: 16,

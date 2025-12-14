@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { NotesProvider } from './src/context/NotesContext';
+import { TodosProvider } from './src/context/TodosContext';
 import { CategoriesProvider } from './src/context/CategoriesContext';
 import { TagsProvider } from './src/context/TagsContext';
 import { AuthNavigator } from './src/navigation/AuthNavigator';
@@ -23,11 +24,13 @@ const AppContent: React.FC = () => {
     <NavigationContainer>
       {isAuthenticated ? (
         <NotesProvider>
-          <CategoriesProvider>
-            <TagsProvider>
-              <AppNavigator />
-            </TagsProvider>
-          </CategoriesProvider>
+          <TodosProvider>
+            <CategoriesProvider>
+              <TagsProvider>
+                <AppNavigator />
+              </TagsProvider>
+            </CategoriesProvider>
+          </TodosProvider>
         </NotesProvider>
       ) : (
         <AuthNavigator />

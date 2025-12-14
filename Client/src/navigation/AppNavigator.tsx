@@ -3,6 +3,9 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { NotesListScreen, AppStackParamList } from '../screens/Notes/NotesListScreen';
 import { NoteDetailScreen } from '../screens/Notes/NoteDetailScreen';
 import { NoteEditScreen } from '../screens/Notes/NoteEditScreen';
+import { TodosListScreen } from '../screens/Todos/TodosListScreen';
+import { TodoDetailScreen } from '../screens/Todos/TodoDetailScreen';
+import { TodoEditScreen } from '../screens/Todos/TodoEditScreen';
 import { TrashScreen } from '../screens/Notes/TrashScreen';
 import { ShareNoteScreen } from '../screens/Notes/ShareNoteScreen';
 import { SharedNotesScreen } from '../screens/Notes/SharedNotesScreen';
@@ -46,6 +49,27 @@ export const AppNavigator: React.FC = () => {
         component={NoteEditScreen}
         options={({ route }) => ({
           title: route.params?.noteId ? 'Chỉnh sửa ghi chú' : 'Tạo ghi chú mới',
+        })}
+      />
+      <Stack.Screen 
+        name="TodosList" 
+        component={TodosListScreen}
+        options={{
+          title: 'Todos',
+        }}
+      />
+      <Stack.Screen 
+        name="TodoDetail" 
+        component={TodoDetailScreen}
+        options={{
+          title: 'Chi tiết todo',
+        }}
+      />
+      <Stack.Screen 
+        name="TodoEdit" 
+        component={TodoEditScreen}
+        options={({ route }) => ({
+          title: route.params?.todoId ? 'Chỉnh sửa todo' : 'Tạo todo mới',
         })}
       />
       <Stack.Screen 

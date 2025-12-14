@@ -22,6 +22,9 @@ export type AppStackParamList = {
   NotesList: { categoryId?: number } | undefined;
   NoteDetail: { noteId: number };
   NoteEdit: { noteId?: number };
+  TodosList: { categoryId?: number } | undefined;
+  TodoDetail: { todoId: number };
+  TodoEdit: { todoId?: number };
   CategoriesList: undefined;
   CategoryEdit: { categoryId?: number };
   Trash: undefined;
@@ -124,6 +127,10 @@ export const NotesListScreen: React.FC = () => {
     navigation.navigate('Settings');
   };
 
+  const handleTodosPress = () => {
+    navigation.navigate('TodosList');
+  };
+
   // Set header options với nút Settings
   useEffect(() => {
     navigation.setOptions({
@@ -191,6 +198,9 @@ export const NotesListScreen: React.FC = () => {
       />
       
       <View style={styles.fabContainer}>
+        <TouchableOpacity style={[styles.fab, styles.todosFab]} onPress={handleTodosPress}>
+          <Text style={styles.fabIcon}>✓</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={[styles.fab, styles.sharedFab]} onPress={handleSharedNotesPress}>
           <Text style={styles.fabIcon}>👥</Text>
         </TouchableOpacity>
@@ -289,6 +299,9 @@ const styles = StyleSheet.create({
   },
   categoriesFab: {
     backgroundColor: '#34C759',
+  },
+  todosFab: {
+    backgroundColor: '#5856D6',
   },
   fabIcon: {
     fontSize: 24,

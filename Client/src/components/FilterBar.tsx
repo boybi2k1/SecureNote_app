@@ -11,12 +11,13 @@ import {
 import { useCategories } from '../context/CategoriesContext';
 import { useTags } from '../context/TagsContext';
 import { NoteFilters } from '../types/note.types';
+import { TodoFilters } from '../types/todo.types';
 import { Category } from '../types/category.types';
 import { Tag } from '../types/tag.types';
 
 interface FilterBarProps {
-  filters: NoteFilters;
-  onFiltersChange: (filters: NoteFilters) => void;
+  filters: NoteFilters | TodoFilters;
+  onFiltersChange: (filters: NoteFilters | TodoFilters) => void;
 }
 
 export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFiltersChange }) => {
@@ -57,17 +58,36 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFiltersChange }
     });
   };
 
+  const handleStatusToggle = (status?: 'pending' | 'in_progress' | 'completed') => {
+    const todoFilters = filters as TodoFilters;
+    onFiltersChange({
+      ...filters,
+      status: todoFilters.status === status ? undefined : status,
+    } as any);
+  };
+
+  const handlePriorityToggle = (priority?: 'low' | 'medium' | 'high' | 'urgent') => {
+    const todoFilters = filters as TodoFilters;
+    onFiltersChange({
+      ...filters,
+      priority: todoFilters.priority === priority ? undefined : priority,
+    } as any);
+  };
+
   const handleClearFilters = () => {
     onFiltersChange({});
   };
 
   const selectedCategory = categories.find((c) => c.id === filters.category_id);
   const selectedTagIds = filters.tag_ids || [];
+  const todoFilters = filters as TodoFilters;
   const hasActiveFilters = 
     filters.category_id !== undefined ||
     (filters.tag_ids && filters.tag_ids.length > 0) ||
     filters.favorite === true ||
-    filters.search !== undefined;
+    filters.search !== undefined ||
+    todoFilters.status !== undefined ||
+    todoFilters.priority !== undefined;
 
   return (
     <View style={styles.container}>
@@ -131,6 +151,98 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFiltersChange }
             {filters.favorite === true ? '⭐ Yêu thích' : '☆ Yêu thích'}
           </Text>
         </TouchableOpacity>
+
+        {/* Status Filter (for Todos) */}
+        {'status' in filters && (
+          <>
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                todoFilters.status === 'pending' && styles.filterButtonActive,
+              ]}
+              onPress={() => handleStatusToggle('pending')}
+            >
+              <Text
+                style={[
+                  styles.filterButtonText,
+                  todoFilters.status === 'pending' && styles.filterButtonTextActive,
+                ]}
+              >
+                Chờ
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                todoFilters.status === 'in_progress' && styles.filterButtonActive,
+              ]}
+              onPress={() => handleStatusToggle('in_progress')}
+            >
+              <Text
+                style={[
+                  styles.filterButtonText,
+                  todoFilters.status === 'in_progress' && styles.filterButtonTextActive,
+                ]}
+              >
+                Đang làm
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                todoFilters.status === 'completed' && styles.filterButtonActive,
+              ]}
+              onPress={() => handleStatusToggle('completed')}
+            >
+              <Text
+                style={[
+                  styles.filterButtonText,
+                  todoFilters.status === 'completed' && styles.filterButtonTextActive,
+                ]}
+              >
+                Hoàn thành
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* Priority Filter (for Todos) */}
+        {'priority' in filters && (
+          <>
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                todoFilters.priority === 'urgent' && styles.filterButtonActive,
+              ]}
+              onPress={() => handlePriorityToggle('urgent')}
+            >
+              <Text
+                style={[
+                  styles.filterButtonText,
+                  todoFilters.priority === 'urgent' && styles.filterButtonTextActive,
+                ]}
+              >
+                Khẩn
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                todoFilters.priority === 'high' && styles.filterButtonActive,
+              ]}
+              onPress={() => handlePriorityToggle('high')}
+            >
+              <Text
+                style={[
+                  styles.filterButtonText,
+                  todoFilters.priority === 'high' && styles.filterButtonTextActive,
+                ]}
+              >
+                Cao
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
 
         {/* Clear Filters */}
         {hasActiveFilters && (
