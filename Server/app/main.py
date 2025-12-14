@@ -5,7 +5,7 @@ from app.config import settings
 from app.database import init_db
 from app.middleware.rate_limit import limiter, RateLimitExceeded
 from app.middleware.security_headers import SecurityHeadersMiddleware
-from app.api.routes import auth, notes, categories, tags, share, users, todos, calendar
+from app.api.routes import auth, notes, categories, tags, share, users, todos, calendar, statistics
 from slowapi import _rate_limit_exceeded_handler
 
 # Initialize database
@@ -43,6 +43,7 @@ app.include_router(share.router, prefix="/api/notes", tags=["Share"])
 app.include_router(notes.router, prefix="/api/notes", tags=["Notes"])
 app.include_router(todos.router, prefix="/api/todos", tags=["Todos"])
 app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"])
+app.include_router(statistics.router, prefix="/api/statistics", tags=["Statistics"])
 app.include_router(categories.router, prefix="/api/categories", tags=["Categories"])
 app.include_router(tags.router, prefix="/api/tags", tags=["Tags"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])

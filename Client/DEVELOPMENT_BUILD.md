@@ -86,3 +86,4 @@ eas build --platform ios --profile development
 
 Sau đó tải file APK/IPA về và cài đặt.
 
+

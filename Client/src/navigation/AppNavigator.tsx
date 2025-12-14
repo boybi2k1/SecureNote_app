@@ -12,6 +12,7 @@ import { SharedNotesScreen } from '../screens/Notes/SharedNotesScreen';
 import { CategoriesScreen } from '../screens/Categories/CategoriesScreen';
 import { CategoryEditScreen } from '../screens/Categories/CategoryEditScreen';
 import { CalendarScreen } from '../screens/Calendar/CalendarScreen';
+import { StatisticsScreen } from '../screens/Statistics/StatisticsScreen';
 import { SettingsScreen } from '../screens/Settings/SettingsScreen';
 import { ProfileScreen } from '../screens/Settings/ProfileScreen';
 import { ChangePasswordScreen } from '../screens/Settings/ChangePasswordScreen';
@@ -92,6 +93,13 @@ export const AppNavigator: React.FC = () => {
         component={CalendarScreen}
         options={{
           title: 'Lịch',
+        }}
+      />
+      <Stack.Screen 
+        name="Statistics" 
+        component={StatisticsScreen}
+        options={{
+          title: 'Thống kê',
         }}
       />
       <Stack.Screen 

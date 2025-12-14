@@ -28,6 +28,7 @@ export type AppStackParamList = {
   CategoriesList: undefined;
   CategoryEdit: { categoryId?: number };
   Calendar: undefined;
+  Statistics: undefined;
   Trash: undefined;
   ShareNote: { noteId: number };
   SharedNotes: undefined;
@@ -136,11 +137,22 @@ export const NotesListScreen: React.FC = () => {
     navigation.navigate('Calendar');
   };
 
-  // Set header options với nút Settings và Calendar
+  const handleStatisticsPress = () => {
+    navigation.navigate('Statistics');
+  };
+
+  // Set header options với nút Statistics, Calendar và Settings
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
         <View style={styles.headerRight}>
+          <TouchableOpacity
+            onPress={handleStatisticsPress}
+            style={styles.headerButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.headerButtonText}>📊</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={handleCalendarPress}
             style={styles.headerButton}
