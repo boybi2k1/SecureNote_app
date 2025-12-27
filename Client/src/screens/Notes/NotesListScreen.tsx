@@ -35,6 +35,7 @@ export type AppStackParamList = {
   Settings: undefined;
   Profile: undefined;
   ChangePassword: undefined;
+  SecuritySettings: undefined;
 };
 
 type NotesListScreenNavigationProp = StackNavigationProp<AppStackParamList, 'NotesList'>;

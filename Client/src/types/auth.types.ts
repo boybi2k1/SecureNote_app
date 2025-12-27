@@ -3,6 +3,8 @@ export interface User {
   username: string;
   email: string;
   created_at: string;
+  two_factor_enabled?: boolean;
+  biometric_enabled?: boolean;
 }
 
 export interface LoginRequest {
@@ -27,5 +29,23 @@ export interface RegisterResponse {
   username: string;
   email: string;
   created_at: string;
+}
+
+export interface TwoFactorSetup {
+  secret: string;
+  qr_code_url: string;
+  backup_codes: string[];
+}
+
+export interface Login2FARequest {
+  username: string;
+  password: string;
+  code?: string;
+  backup_code?: string;
+}
+
+export interface AuthResponseWith2FA extends AuthResponse {
+  requires_2fa?: boolean;
+  message?: string;
 }
 

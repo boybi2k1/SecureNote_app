@@ -6,14 +6,22 @@ import {
   LoginRequest,
   RegisterRequest,
   AuthResponse,
+  AuthResponseWith2FA,
   RegisterResponse,
   User,
+  TwoFactorSetup,
+  Login2FARequest,
 } from '../types/auth.types';
 
 export const authService = {
-  async login(username: string, password: string): Promise<AuthResponse> {
+  async login(username: string, password: string): Promise<AuthResponseWith2FA> {
     const request: LoginRequest = { username, password };
-    const response = await api.post<AuthResponse>('/auth/login', request);
+    const response = await api.post<AuthResponseWith2FA>('/auth/login', request);
+    return response.data;
+  },
+
+  async loginWith2FA(loginData: Login2FARequest): Promise<AuthResponse> {
+    const response = await api.post<AuthResponse>('/auth/login/2fa', loginData);
     return response.data;
   },
 
@@ -50,6 +58,38 @@ export const authService = {
   async getCurrentUser(): Promise<User> {
     const response = await api.get<User>('/users/me');
     return response.data;
+  },
+
+  // 2FA Methods
+  async setup2FA(): Promise<TwoFactorSetup> {
+    const response = await api.post<TwoFactorSetup>('/auth/2fa/setup');
+    return response.data;
+  },
+
+  async setup2FANew(username: string, password: string): Promise<TwoFactorSetup> {
+    const response = await api.post<TwoFactorSetup>('/auth/2fa/setup-new', { username, password });
+    return response.data;
+  },
+
+  async enable2FA(code: string): Promise<void> {
+    await api.post('/auth/2fa/enable', { code });
+  },
+
+  async enable2FANew(username: string, password: string, code: string): Promise<void> {
+    await api.post('/auth/2fa/enable-new', { username, password, code });
+  },
+
+  async disable2FA(password: string): Promise<void> {
+    await api.post('/auth/2fa/disable', { password });
+  },
+
+  // Biometric Methods
+  async enableBiometric(): Promise<void> {
+    await api.put('/auth/biometric/enable');
+  },
+
+  async disableBiometric(): Promise<void> {
+    await api.put('/auth/biometric/disable');
   },
 };
 

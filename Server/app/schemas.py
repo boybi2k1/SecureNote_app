@@ -22,6 +22,8 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     id: int
     created_at: datetime
+    two_factor_enabled: Optional[bool] = False
+    biometric_enabled: Optional[bool] = False
     
     class Config:
         from_attributes = True
@@ -57,6 +59,42 @@ class ChangePasswordRequest(BaseModel):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters')
         return v
+
+
+# 2FA Schemas
+class TwoFactorSetupResponse(BaseModel):
+    secret: str
+    qr_code_url: str
+    backup_codes: List[str]
+
+
+class TwoFactorVerifyRequest(BaseModel):
+    code: str = Field(..., min_length=6, max_length=6)
+
+
+class TwoFactorEnableRequest(BaseModel):
+    code: str = Field(..., min_length=6, max_length=6)
+
+
+class TwoFactorEnableNewRequest(BaseModel):
+    username: str
+    password: str
+    code: str = Field(..., min_length=6, max_length=6)
+
+
+class Login2FARequest(BaseModel):
+    username: str
+    password: str
+    code: Optional[str] = Field(None, min_length=6, max_length=6)
+    backup_code: Optional[str] = Field(None, min_length=8, max_length=8)
+
+
+class BackupCodesResponse(BaseModel):
+    codes: List[str]
+
+
+class Disable2FARequest(BaseModel):
+    password: str
 
 
 # Category Schemas

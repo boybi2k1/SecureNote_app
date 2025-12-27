@@ -16,6 +16,7 @@ import { StatisticsScreen } from '../screens/Statistics/StatisticsScreen';
 import { SettingsScreen } from '../screens/Settings/SettingsScreen';
 import { ProfileScreen } from '../screens/Settings/ProfileScreen';
 import { ChangePasswordScreen } from '../screens/Settings/ChangePasswordScreen';
+import { SecuritySettingsScreen } from '../screens/Settings/SecuritySettingsScreen';
 
 const Stack = createStackNavigator<AppStackParamList>();
 
@@ -142,6 +143,13 @@ export const AppNavigator: React.FC = () => {
         component={ChangePasswordScreen}
         options={{
           title: 'Đổi mật khẩu',
+        }}
+      />
+      <Stack.Screen 
+        name="SecuritySettings" 
+        component={SecuritySettingsScreen}
+        options={{
+          title: 'Bảo mật',
         }}
       />
     </Stack.Navigator>

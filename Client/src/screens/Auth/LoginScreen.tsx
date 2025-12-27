@@ -30,6 +30,9 @@ export const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [useBackupCode, setUseBackupCode] = useState(false);
 
   const handleLogin = async () => {
     // Validation
@@ -42,11 +45,41 @@ export const LoginScreen: React.FC = () => {
       return;
     }
 
+    // If 2FA is required, verify code
+    if (requires2FA) {
+      if (!useBackupCode && (!twoFactorCode || twoFactorCode.length !== 6)) {
+        setError('Vui lòng nhập mã 2FA 6 số');
+        return;
+      }
+      if (useBackupCode && (!twoFactorCode || twoFactorCode.length !== 8)) {
+        setError('Vui lòng nhập mã dự phòng 8 ký tự');
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+        await login(username.trim(), password, twoFactorCode, useBackupCode);
+      } catch (err: any) {
+        const errorMessage = err.message || 'Mã xác thực không đúng';
+        setError(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Initial login
     try {
       setLoading(true);
       setError(null);
-      await login(username.trim(), password);
-      // Navigation sẽ được xử lý bởi App.tsx dựa trên isAuthenticated
+      const response = await login(username.trim(), password);
+      
+      // Check if 2FA is required
+      if (response.requires_2fa) {
+        setRequires2FA(true);
+        setError(null);
+      }
     } catch (err: any) {
       const errorMessage = err.message || 'Đăng nhập thất bại';
       
@@ -114,10 +147,48 @@ export const LoginScreen: React.FC = () => {
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
-                editable={!loading}
+                editable={!loading && !requires2FA}
                 onSubmitEditing={handleLogin}
               />
             </View>
+
+            {requires2FA && (
+              <>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>
+                    {useBackupCode ? 'Mã dự phòng (8 ký tự)' : 'Mã 2FA (6 số)'}
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={useBackupCode ? "Nhập mã dự phòng" : "000000"}
+                    value={twoFactorCode}
+                    onChangeText={(text) => {
+                      setTwoFactorCode(text);
+                      setError(null);
+                    }}
+                    keyboardType="default"
+                    autoCapitalize="characters"
+                    maxLength={useBackupCode ? 8 : 6}
+                    editable={!loading}
+                    autoFocus
+                    onSubmitEditing={handleLogin}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={styles.linkButton}
+                  onPress={() => {
+                    setUseBackupCode(!useBackupCode);
+                    setTwoFactorCode('');
+                    setError(null);
+                  }}
+                >
+                  <Text style={styles.linkText}>
+                    {useBackupCode ? 'Sử dụng mã 2FA' : 'Sử dụng mã dự phòng'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
 
             <TouchableOpacity
               style={[styles.button, loading && styles.buttonDisabled]}
@@ -127,7 +198,9 @@ export const LoginScreen: React.FC = () => {
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>Đăng nhập</Text>
+                <Text style={styles.buttonText}>
+                  {requires2FA ? 'Xác thực và Đăng nhập' : 'Đăng nhập'}
+                </Text>
               )}
             </TouchableOpacity>
 
@@ -232,6 +305,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007AFF',
     fontWeight: '600',
+  },
+  linkButton: {
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  linkText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '500',
   },
 });
 

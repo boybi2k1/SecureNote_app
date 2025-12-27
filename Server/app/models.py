@@ -15,6 +15,12 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     is_active = Column(Boolean, default=True)
     
+    # 2FA fields
+    two_factor_secret = Column(String(32), nullable=True)  # TOTP secret key (base32)
+    two_factor_enabled = Column(Boolean, default=False, index=True)
+    two_factor_backup_codes = Column(Text, nullable=True)  # JSON array of hashed backup codes
+    biometric_enabled = Column(Boolean, default=False)  # Allow biometric login
+    
     # Relationships
     notes = relationship("Note", back_populates="owner", cascade="all, delete-orphan")
     todos = relationship("Todo", back_populates="owner", cascade="all, delete-orphan")

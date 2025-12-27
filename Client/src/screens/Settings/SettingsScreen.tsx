@@ -142,6 +142,13 @@ export const SettingsScreen: React.FC = () => {
           >
             <Text style={styles.actionButtonText}>Đổi mật khẩu</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, styles.securityButton]}
+            onPress={() => navigation.navigate('SecuritySettings')}
+          >
+            <Text style={styles.actionButtonText}>Bảo mật</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Settings Section */}
@@ -305,6 +312,10 @@ const styles = StyleSheet.create({
   },
   changePasswordButton: {
     backgroundColor: '#5856D6',
+    marginTop: 8,
+  },
+  securityButton: {
+    backgroundColor: '#34C759',
     marginTop: 8,
   },
   actionButtonText: {

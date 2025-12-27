@@ -1,27 +1,18 @@
 # Hướng dẫn chạy Server và Client
 
 ## Chạy Server
-
 Mở PowerShell hoặc Command Prompt và di chuyển vào thư mục Server:
 ```powershell
 cd Server
 ```
-
 Tạo virtual environment (nếu chưa có):
-```powershell
-python -m venv venv
-```
-
+                    python -m venv venv
 Kích hoạt virtual environment:
-```powershell
-.\venv\Scripts\Activate.ps1
+                    .\venv\Scripts\Activate.ps1
 ```
-
 Cài đặt dependencies:
-```powershell
 pip install -r requirements.txt
 ```
-
 Tạo file .env (nếu chưa có):
 - Cách 1: Tự động tạo (khuyến nghị cho development):
   ```powershell
@@ -32,8 +23,12 @@ Tạo file .env (nếu chưa có):
   copy env.example .env
   ```
 
-Chạy server:
+Chạy migration 2FA (nếu database đã có dữ liệu cũ):
 ```powershell
+python migrate_2fa.py
+```
+
+Chạy server:
 cd Server
 .\venv\Scripts\Activate.ps1
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

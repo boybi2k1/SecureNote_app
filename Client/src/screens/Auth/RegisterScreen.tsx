@@ -19,6 +19,7 @@ import { RegisterRequest } from '../../types/auth.types';
 type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
+  TwoFactorSetup: undefined;
 };
 
 type RegisterScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Register'>;
@@ -68,7 +69,11 @@ export const RegisterScreen: React.FC = () => {
         password,
       };
       await register(userData);
-      // Auto login và navigation sẽ được xử lý bởi AuthContext
+      // Navigate to 2FA setup (mandatory for new users) with credentials
+      navigation.replace('TwoFactorSetup', {
+        username: username.trim(),
+        password: password,
+      });
     } catch (err: any) {
       const errorMessage = err.message || 'Đăng ký thất bại';
       

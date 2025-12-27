@@ -78,5 +78,51 @@ export const storageService = {
     await this.clearTokens();
     await this.clearUserData();
   },
+
+  // Generic secure storage methods for biometric
+  async setSecureItem(key: string, value: string): Promise<void> {
+    try {
+      await SecureStore.setItemAsync(key, value);
+    } catch (error) {
+      console.error(`Error storing secure item ${key}:`, error);
+      throw error;
+    }
+  },
+
+  async getSecureItem(key: string): Promise<string | null> {
+    try {
+      return await SecureStore.getItemAsync(key);
+    } catch (error) {
+      console.error(`Error getting secure item ${key}:`, error);
+      return null;
+    }
+  },
+
+  // Generic async storage methods
+  async setItem(key: string, value: string): Promise<void> {
+    try {
+      await AsyncStorage.setItem(key, value);
+    } catch (error) {
+      console.error(`Error storing item ${key}:`, error);
+      throw error;
+    }
+  },
+
+  async getItem(key: string): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem(key);
+    } catch (error) {
+      console.error(`Error getting item ${key}:`, error);
+      return null;
+    }
+  },
+
+  async removeItem(key: string): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(key);
+    } catch (error) {
+      console.error(`Error removing item ${key}:`, error);
+    }
+  },
 };
 
