@@ -84,12 +84,33 @@ export const authService = {
   },
 
   // Biometric Methods
-  async enableBiometric(): Promise<void> {
-    await api.put('/auth/biometric/enable');
+  async enableBiometric(): Promise<{ codes: string[] }> {
+    const response = await api.put<{ codes: string[] }>('/auth/biometric/enable');
+    return response.data;
   },
 
   async disableBiometric(): Promise<void> {
     await api.put('/auth/biometric/disable');
+  },
+
+  async loginWithBiometric(username: string, backupCode: string): Promise<AuthResponse> {
+    const loginData: Login2FARequest = {
+      username,
+      password: '', // Not needed for biometric login
+      backup_code: backupCode,
+    };
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/1004e74e-00b9-491b-9a87-b0f9cd913a95',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authService.ts:96',message:'Calling biometric login API',data:{username,backupCodeLength:backupCode.length},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+    
+    const response = await api.post<AuthResponse>('/auth/biometric/login', loginData);
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/1004e74e-00b9-491b-9a87-b0f9cd913a95',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'authService.ts:103',message:'Biometric login API response',data:{hasNewBackupCode:!!response.data.new_backup_code,newBackupCodeLength:response.data.new_backup_code?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+    
+    return response.data;
   },
 };
 

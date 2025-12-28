@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { biometricService, BiometricCredential } from '../../services/biometricService';
 
 type AuthStackParamList = {
   Login: undefined;
@@ -24,7 +25,7 @@ type LoginScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Login'
 
 export const LoginScreen: React.FC = () => {
   const navigation = useNavigation<LoginScreenNavigationProp>();
-  const { login } = useAuth();
+  const { login, loginWithBiometric } = useAuth();
   
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -33,6 +34,91 @@ export const LoginScreen: React.FC = () => {
   const [requires2FA, setRequires2FA] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [useBackupCode, setUseBackupCode] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricCredential, setBiometricCredential] = useState<BiometricCredential | null>(null);
+
+  // Check biometric availability and credential on mount
+  React.useEffect(() => {
+    checkBiometric();
+  }, []);
+
+  const checkBiometric = async () => {
+    const available = await biometricService.isAvailable();
+    setBiometricAvailable(available);
+    
+    if (available) {
+      const enabled = await biometricService.isBiometricEnabled();
+      setBiometricEnabled(enabled);
+      
+      if (enabled) {
+        const credential = await biometricService.getBiometricCredential();
+        setBiometricCredential(credential);
+      }
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    if (!biometricAvailable || !biometricCredential) {
+      Alert.alert('Lỗi', 'Đăng nhập vân tay chưa được thiết lập');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/1004e74e-00b9-491b-9a87-b0f9cd913a95',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LoginScreen.tsx:handleBiometricLogin',message:'Starting biometric login',data:{username:biometricCredential.username,backupCodeLength:biometricCredential.encryptedToken.length},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+
+      // Authenticate with biometric
+      const authenticated = await biometricService.authenticate(
+        'Xác thực để đăng nhập'
+      );
+
+      if (!authenticated) {
+        setLoading(false);
+        return; // User cancelled
+      }
+
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/1004e74e-00b9-491b-9a87-b0f9cd913a95',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LoginScreen.tsx:handleBiometricLogin',message:'Biometric authenticated, calling loginWithBiometric',data:{backupCode:biometricCredential.encryptedToken},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+
+      // Login with credential
+      await loginWithBiometric(
+        biometricCredential.username,
+        biometricCredential.encryptedToken
+      );
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/1004e74e-00b9-491b-9a87-b0f9cd913a95',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LoginScreen.tsx:handleBiometricLogin',message:'Login successful - backup code is reusable',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+      
+      // No need to refresh credential - backup code is reusable
+    } catch (err: any) {
+      const errorMessage = err.message || 'Đăng nhập vân tay thất bại';
+      setError(errorMessage);
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/1004e74e-00b9-491b-9a87-b0f9cd913a95',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'LoginScreen.tsx:handleBiometricLogin',message:'Login error',data:{error:errorMessage,status:err.response?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+      
+      // If backup code is invalid, clear credential
+      if (err.response?.status === 401) {
+        await biometricService.clearBiometricCredential();
+        setBiometricEnabled(false);
+        setBiometricCredential(null);
+        Alert.alert(
+          'Lỗi',
+          'Mã xác thực đã hết hạn. Vui lòng đăng nhập bằng mật khẩu và bật lại đăng nhập vân tay.'
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     // Validation
@@ -204,6 +290,25 @@ export const LoginScreen: React.FC = () => {
               )}
             </TouchableOpacity>
 
+            {biometricAvailable && biometricEnabled && biometricCredential && !requires2FA && (
+              <View style={styles.biometricContainer}>
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>HOẶC</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+                <TouchableOpacity
+                  style={[styles.biometricButton, loading && styles.buttonDisabled]}
+                  onPress={handleBiometricLogin}
+                  disabled={loading}
+                >
+                  <Text style={styles.biometricButtonText}>
+                    {Platform.OS === 'ios' ? '🔐 Đăng nhập bằng Face ID' : '🔐 Đăng nhập bằng vân tay'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             <View style={styles.registerContainer}>
               <Text style={styles.registerText}>Chưa có tài khoản? </Text>
               <TouchableOpacity
@@ -314,6 +419,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007AFF',
     fontWeight: '500',
+  },
+  biometricContainer: {
+    marginTop: 20,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ddd',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 12,
+    color: '#999',
+  },
+  biometricButton: {
+    backgroundColor: '#34C759',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  biometricButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

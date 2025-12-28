@@ -11,7 +11,7 @@ import {
   TextInput,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
-import { biometricService } from '../../services/biometricService';
+import { biometricService, BiometricCredential } from '../../services/biometricService';
 
 export const SecuritySettingsScreen: React.FC = () => {
   const { user, enableBiometric, disableBiometric, disable2FA } = useAuth();
@@ -56,9 +56,26 @@ export const SecuritySettingsScreen: React.FC = () => {
 
       try {
         setLoading(true);
-        await enableBiometric();
+        // Enable biometric and get backup code
+        const backupCode = await enableBiometric();
+        
+        // Get username from user
+        if (!user?.username) {
+          throw new Error('Không tìm thấy username');
+        }
+        
+        // Save credential (username + backup code) to secure storage
+        const credential: BiometricCredential = {
+          username: user.username,
+          encryptedToken: backupCode, // Backup code for biometric login
+        };
+        await biometricService.saveBiometricCredential(credential);
+        
         setBiometricEnabled(true);
-        Alert.alert('Thành công', 'Đăng nhập vân tay đã được bật');
+        Alert.alert(
+          'Thành công',
+          'Đăng nhập vân tay đã được bật. Bạn có thể sử dụng vân tay để đăng nhập lần sau.'
+        );
       } catch (error: any) {
         Alert.alert('Lỗi', error.message || 'Không thể bật đăng nhập vân tay');
       } finally {

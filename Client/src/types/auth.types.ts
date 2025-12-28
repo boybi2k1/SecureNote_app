@@ -22,6 +22,7 @@ export interface AuthResponse {
   access_token: string;
   refresh_token: string;
   token_type: string;
+  new_backup_code?: string; // For biometric login - new code to save
 }
 
 export interface RegisterResponse {

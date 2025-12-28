@@ -39,6 +39,7 @@ class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    new_backup_code: Optional[str] = None  # For biometric login - new code to save
 
 
 class TokenData(BaseModel):

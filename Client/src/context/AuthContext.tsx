@@ -14,8 +14,9 @@ interface AuthContextType {
   setup2FA: () => Promise<any>;
   enable2FA: (code: string) => Promise<void>;
   disable2FA: (password: string) => Promise<void>;
-  enableBiometric: () => Promise<void>;
+  enableBiometric: () => Promise<string>;
   disableBiometric: () => Promise<void>;
+  loginWithBiometric: (username: string, backupCode: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -147,10 +148,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Biometric Methods
   const enableBiometric = async () => {
-    await authService.enableBiometric();
+    const result = await authService.enableBiometric();
     const userData = await authService.getCurrentUser();
     setUser(userData);
     await storageService.storeUserData(userData);
+    // Return backup code to be saved
+    return result.codes[0];
+  };
+
+  const loginWithBiometric = async (username: string, backupCode: string) => {
+    try {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/1004e74e-00b9-491b-9a87-b0f9cd913a95',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:159',message:'Biometric login started',data:{username,backupCodeLength:backupCode.length},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+      
+      const authResponse = await authService.loginWithBiometric(username, backupCode);
+      await storageService.storeTokens(authResponse.access_token, authResponse.refresh_token);
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/1004e74e-00b9-491b-9a87-b0f9cd913a95',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:165',message:'Login response received - backup code is reusable',data:{hasNewBackupCode:!!authResponse.new_backup_code},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+      
+      // Backup code is now reusable - no need to update credential
+      // The same backup code can be used for multiple logins
+      
+      const userData = await authService.getCurrentUser();
+      setUser(userData);
+      await storageService.storeUserData(userData);
+    } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/1004e74e-00b9-491b-9a87-b0f9cd913a95',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:175',message:'Biometric login error',data:{error:error.message,status:error.response?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+      const errorMessage = error.response?.data?.detail || error.message || 'Đăng nhập vân tay thất bại';
+      throw new Error(errorMessage);
+    }
   };
 
   const disableBiometric = async () => {
@@ -190,6 +221,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     disable2FA,
     enableBiometric,
     disableBiometric,
+    loginWithBiometric,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

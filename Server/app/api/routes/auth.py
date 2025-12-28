@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from datetime import timedelta, datetime
+import json
 from app.database import get_db
 from app.models import User, RefreshToken
 from app.schemas import (
@@ -474,22 +475,171 @@ async def disable_2fa(
 
 
 # Biometric Endpoints
-@router.put("/biometric/enable")
+@router.put("/biometric/enable", response_model=BackupCodesResponse)
 async def enable_biometric(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Enable biometric login"""
+    """Enable biometric login and return a backup code for biometric authentication"""
     if not current_user.two_factor_enabled:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="2FA must be enabled before enabling biometric login"
         )
     
+    # Generate a single backup code for biometric login
+    backup_codes = generate_backup_codes(1)
+    backup_code = backup_codes[0]
+    
+    # Add this backup code to existing backup codes
+    if current_user.two_factor_backup_codes:
+        existing_codes = json.loads(current_user.two_factor_backup_codes)
+        existing_codes.append(hash_password(backup_code))
+        current_user.two_factor_backup_codes = json.dumps(existing_codes)
+    else:
+        current_user.two_factor_backup_codes = hash_backup_codes(backup_codes)
+    
     current_user.biometric_enabled = True
     db.commit()
     
-    return {"message": "Biometric login enabled"}
+    # Return the backup code (only shown once)
+    return {"codes": backup_codes}
+
+
+@router.post("/biometric/login", response_model=Token)
+@limiter.limit("5/minute")
+async def biometric_login(
+    request: Request,
+    login_data: Login2FARequest,
+    db: Session = Depends(get_db)
+):
+    """Login using biometric (username + backup code only, no password required)"""
+    # #region agent log
+    with open(r'e:\SecureNote\.cursor\debug.log', 'a', encoding='utf-8') as f:
+        import time
+        f.write(json.dumps({"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"H1","location":"auth.py:516","message":"Biometric login started","data":{"username":login_data.username},"timestamp":int(time.time()*1000)}) + '\n')
+    # #endregion
+    
+    # Find user by username or email
+    user = db.query(User).filter(
+        (User.username == login_data.username) | (User.email == login_data.username)
+    ).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive"
+        )
+    
+    if not user.biometric_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Biometric login is not enabled for this account"
+        )
+    
+    if not user.two_factor_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="2FA is not enabled"
+        )
+    
+    # Verify backup code
+    if not login_data.backup_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Backup code is required for biometric login"
+        )
+    
+    if not user.two_factor_backup_codes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No backup codes available"
+        )
+    
+    # #region agent log
+    with open(r'e:\SecureNote\.cursor\debug.log', 'a', encoding='utf-8') as f:
+        import time
+        backup_codes_count = len(json.loads(user.two_factor_backup_codes)) if user.two_factor_backup_codes else 0
+        f.write(json.dumps({"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"H1","location":"auth.py:558","message":"Before verify backup code","data":{"backup_codes_count":backup_codes_count},"timestamp":int(time.time()*1000)}) + '\n')
+    # #endregion
+    
+    # For biometric login, verify the backup code but keep it reusable (don't change it)
+    # This allows the same backup code to be used multiple times for biometric login
+    verified = False
+    hashed_codes = json.loads(user.two_factor_backup_codes) if user.two_factor_backup_codes else []
+    
+    # Find the matching backup code
+    for i, hashed_code in enumerate(hashed_codes):
+        if verify_password(login_data.backup_code, hashed_code):
+            verified = True
+            # #region agent log
+            with open(r'e:\SecureNote\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                import time
+                f.write(json.dumps({"sessionId":"debug-session","runId":"post-fix","hypothesisId":"H1","location":"auth.py:570","message":"Backup code verified - keeping reusable","data":{"code_index":i},"timestamp":int(time.time()*1000)}) + '\n')
+            # #endregion
+            break
+    
+    if not verified:
+        # #region agent log
+        with open(r'e:\SecureNote\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            import time
+            f.write(json.dumps({"sessionId":"debug-session","runId":"post-fix","hypothesisId":"H1","location":"auth.py:576","message":"Backup code verification failed","data":{},"timestamp":int(time.time()*1000)}) + '\n')
+        # #endregion
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid backup code"
+        )
+    
+    # No need to generate new backup code - keep the same one for reuse
+    # The backup code remains unchanged in the database
+    
+    # #region agent log
+    with open(r'e:\SecureNote\.cursor\debug.log', 'a', encoding='utf-8') as f:
+        import time
+        f.write(json.dumps({"sessionId":"debug-session","runId":"post-fix","hypothesisId":"H1","location":"auth.py:595","message":"Backup code verified, keeping same code for reuse","data":{"backup_codes_count":len(hashed_codes)},"timestamp":int(time.time()*1000)}) + '\n')
+    # #endregion
+    
+    # Create tokens
+    access_token = create_access_token(data={"sub": user.id})
+    refresh_token = create_refresh_token(data={"sub": user.id})
+    
+    # Store refresh token
+    expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    db_refresh_token = RefreshToken(
+        user_id=user.id,
+        token=refresh_token,
+        expires_at=expires_at
+    )
+    db.add(db_refresh_token)
+    db.commit()
+    
+    # #region agent log
+    with open(r'e:\SecureNote\.cursor\debug.log', 'a', encoding='utf-8') as f:
+        import time
+        f.write(json.dumps({"sessionId":"debug-session","runId":"post-fix","hypothesisId":"H1","location":"auth.py:613","message":"Biometric login successful","data":{"user_id":user.id},"timestamp":int(time.time()*1000)}) + '\n')
+    # #endregion
+    
+    # Return tokens (no need to return new_backup_code since we're keeping the same one)
+    response_data = {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
+    
+    # #region agent log
+    with open(r'e:\SecureNote\.cursor\debug.log', 'a', encoding='utf-8') as f:
+        import time
+        f.write(json.dumps({"sessionId":"debug-session","runId":"post-fix","hypothesisId":"H1","location":"auth.py:644","message":"Returning response without new_backup_code (reusable)","data":{},"timestamp":int(time.time()*1000)}) + '\n')
+    # #endregion
+    
+    return response_data
 
 
 @router.put("/biometric/disable")
